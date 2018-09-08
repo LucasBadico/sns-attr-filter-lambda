@@ -1,0 +1,85 @@
+# Welcome to Serverless!
+#
+# This file is the main config file for your service.
+# It's very minimal at this point and uses default values.
+# You can always add more config options for more control.
+# We've included some commented out config examples here.
+# Just uncomment any of them to get that config option.
+#
+# For full config options, check the docs:
+#    docs.serverless.com
+#
+# Happy Coding!
+
+service: sqs-sqn-poc # NOTE: update this with your service name
+package:
+  exclude:
+    - 'node_modules/**'
+# You can pin your service to only deploy with a specific Serverless version
+# Check out our docs for more details
+# frameworkVersion: "=X.X.X"
+
+provider:
+  name: aws
+  region: us-east-1
+  runtime: nodejs8.10
+  variableSyntax: "\\${{([ ~:a-zA-Z0-9._\\'\",\\-\\/\\(\\)]+?)}}"
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - SNS:ListSubscriptions
+      Resource: { "Fn::Join" : ["", ["arn:aws:sns:${{self:custom.region}}:", { "Ref" : "AWS::AccountId" }, ":${{self:custom.greeterTopic}}" ] ]  }
+    - Effect: Allow
+      Action:
+        - SNS:setSubscriptionAttributes
+      Resource: { "Fn::Join" : ["", ["arn:aws:sns:${{self:custom.region}}:", { "Ref" : "AWS::AccountId" }, ":${{self:custom.greeterTopic}}" ] ]  }
+custom:
+  stage: ${{opt:stage, self:provider.stage}}
+  region: ${{opt:region, self:provider.region}}
+  greeterTopic: accounts-events ##"${{self:service}}-accounts-${{self:custom.stage}}"
+  greeterTopicArn:
+    Fn::Join:
+      - ''
+      - - "arn:aws:sns:${{self:custom.region}}:"
+        - Ref: AWS::AccountId
+        - ":${{self:custom.greeterTopic}}"
+functions:
+  hello:
+    handler: handler.hello
+    events:
+      - sns: arn:aws:sns:us-east-1:739649310064:accounts-events
+      
+  send-confirmation-email:
+    handler: creation.sendConfirmationEmail
+    events:
+      - sns: 
+          arn: 
+            Fn::Join:
+              - ''
+              - - "arn:aws:sns:${{self:custom.region}}:"
+                - Ref: AWS::AccountId
+                - ":accounts-events"
+          topicName: accounts-events
+          # filter policy to accept messages with attrib_one values including "foo" OR "bar"
+          filter:
+            kind:
+              - creation-done
+
+  create-payment-account:
+    handler: enriquecimento.createPaymentAccount
+    events:
+      - sns: 
+          arn: 
+            Fn::Join:
+              - ''
+              - - "arn:aws:sns:${{self:custom.region}}:"
+                - Ref: AWS::AccountId
+                - ":accounts-events"
+          topicName: accounts-events
+          # filter policy to accept messages with attrib_one values including "foo" OR "bar"
+          filter:
+            kind:
+              - enrequecimento-done
+
+plugins:
+  - serverless-sns-filter
